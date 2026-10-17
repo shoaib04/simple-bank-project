@@ -1,0 +1,17 @@
+# Fund Transfer Requirement-to-Test Traceability
+
+| Requirement | Automated test coverage |
+| --- | --- |
+| FR-001: Invalid and rounded-zero amounts | `tests/unit/test_transfer_rules.py::test_non_positive_or_rounded_zero_amount_is_rejected`; `tests/api/test_transfer_rejections.py` |
+| FR-002: Sufficient sender balance | `tests/unit/test_transfer_rules.py::test_rounding_is_applied_before_balance_validation`; `tests/integration/test_transfer_rejections.py::test_insufficient_balance_is_saved_without_balance_changes` |
+| FR-003: Customer-wide UTC daily cap | `tests/unit/test_transfer_rules.py::test_customer_daily_cap_allows_exact_limit_and_rejects_overage`; `tests/integration/test_transfer_rejections.py::test_customer_daily_limit_rejection_is_saved_without_balance_changes`; `tests/integration/test_transfer_concurrency.py` |
+| FR-004: Different source and destination accounts | `tests/unit/test_transfer_rules.py::test_same_account_transfer_is_rejected`; `tests/integration/test_transfer_rejections.py::test_same_account_is_saved_as_rejection` |
+| FR-005: Both accounts active | `tests/unit/test_transfer_rules.py::test_transfer_with_inactive_account_is_rejected`; `tests/integration/test_transfer_rejections.py::test_inactive_recipient_is_saved_without_balance_changes` |
+| FR-006: Saved unique outcome for completed and rejected requests | `tests/integration/test_transfer_atomicity.py`; `tests/integration/test_transfer_rejections.py`; `tests/api/test_transfer_success.py` |
+| FR-007: Outcome within one second | `tests/performance/test_transfer_latency.py::test_one_hundred_concurrent_transfer_responses_arrive_within_one_second` |
+| FR-008: Exact decimal arithmetic and half-up rounding | `tests/unit/test_transfer_rules.py::test_amount_rounding_uses_half_up_to_two_places`; `tests/integration/test_transfer_atomicity.py::test_transfer_posts_rounded_amount_and_both_balances_atomically` |
+| FR-009: Masked account references and logs | `tests/api/test_transfer_masking.py::test_transfer_response_masks_both_account_numbers`; `tests/unit/test_account_log_masking.py::test_transfer_logs_never_include_full_account_numbers` |
+| FR-010: Automated coverage mapping | This matrix maps FR-001 through FR-009 and FR-011 through FR-013 to automated test paths. |
+| FR-011: Idempotent retries and separate logical requests | `tests/integration/test_transfer_idempotency.py::test_retry_replays_result_but_new_key_creates_new_transfer`; `tests/integration/test_transfer_idempotency.py::test_reusing_idempotency_key_with_different_payload_returns_conflict` |
+| FR-012: 100 concurrent requests preserve rules and outcomes | `tests/integration/test_transfer_concurrency.py::test_one_hundred_concurrent_transfers_preserve_both_daily_caps`; `tests/performance/test_transfer_latency.py::test_one_hundred_concurrent_transfer_responses_arrive_within_one_second` |
+| FR-013: Account-age daily cap and exact 30-day boundary | `tests/unit/test_transfer_rules.py::test_recent_account_uses_fifty_thousand_cap`; `tests/unit/test_transfer_rules.py::test_account_just_under_thirty_days_uses_recent_account_cap`; `tests/unit/test_transfer_rules.py::test_account_exactly_thirty_days_old_uses_one_hundred_thousand_cap`; `tests/integration/test_transfer_rejections.py::test_recent_source_account_daily_limit_rejection_is_saved`; `tests/integration/test_transfer_concurrency.py::test_one_hundred_concurrent_transfers_preserve_both_daily_caps` |

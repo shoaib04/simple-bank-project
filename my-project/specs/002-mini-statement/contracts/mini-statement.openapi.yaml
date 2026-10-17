@@ -1,0 +1,126 @@
+openapi: 3.1.0
+info:
+  title: Simple Bank Mini Statement API
+  version: 1.0.0
+  description: Returns the latest completed activity for an account owned by the authenticated customer.
+servers:
+  - url: /
+paths:
+  /api/v1/accounts/{account_number}/mini-statement:
+    get:
+      operationId: getMiniStatement
+      summary: Get an account's mini statement
+      description: >-
+        Returns at most 10 completed transfers newest first. Customer identity is supplied by
+        the bank application's trusted authentication context. A missing account and an account
+        owned by another customer both return 404. The raw path account number is never echoed
+        or logged. Equal timestamps are ordered by transaction_id descending.
+      parameters:
+        - name: account_number
+          in: path
+          required: true
+          description: Account number to look up; the value is never returned in the response.
+          schema:
+            type: string
+            minLength: 1
+          example: "1234567890121234"
+      responses:
+        "200":
+          description: Statement returned, including an empty list when there is no completed activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MiniStatementResponse"
+              example:
+                account_number: "XXXX1234"
+                transactions:
+                  - date: "2026-10-17T12:00:00Z"
+                    description: "Transfer to XXXX5678"
+                    debit: "125.50"
+                    credit: "0.00"
+                    amount: "125.50"
+                    balance_after: "874.50"
+        "401":
+          description: No authenticated customer context is available.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: Account is missing or not owned by the authenticated customer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Account number path parameter is malformed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+components:
+  schemas:
+    MiniStatementResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - account_number
+        - transactions
+      properties:
+        account_number:
+          type: string
+          pattern: "^XXXX[0-9]{4}$"
+          description: Masked account number showing only the final four digits.
+        transactions:
+          type: array
+          maxItems: 10
+          description: Completed transfers ordered by date descending, then transaction ID descending.
+          items:
+            $ref: "#/components/schemas/MiniStatementEntry"
+    MiniStatementEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - date
+        - description
+        - debit
+        - credit
+        - amount
+        - balance_after
+      properties:
+        date:
+          type: string
+          format: date-time
+          description: Transaction timestamp in UTC.
+        description:
+          type: string
+          description: Transfer direction and counterparty account masked to its final four digits.
+        debit:
+          type: string
+          pattern: "^[0-9]+\\.[0-9]{2}$"
+          description: Positive amount for an outgoing transfer, otherwise 0.00.
+        credit:
+          type: string
+          pattern: "^[0-9]+\\.[0-9]{2}$"
+          description: Positive amount for an incoming transfer, otherwise 0.00.
+        amount:
+          type: string
+          pattern: "^[0-9]+\\.[0-9]{2}$"
+          description: Positive transfer amount.
+        balance_after:
+          type: string
+          pattern: "^-?[0-9]+\\.[0-9]{2}$"
+          description: Account balance immediately after this transfer.
+    ApiError:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_REQUEST
+        message:
+          type: string

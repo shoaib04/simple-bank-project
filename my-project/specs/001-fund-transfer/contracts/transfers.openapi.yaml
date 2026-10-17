@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: Simple Bank Fund Transfer API
+  version: 1.0.0
+  description: >-
+    Evaluates and saves customer transfer attempts. Customer identity is supplied
+    by the bank application's trusted authentication context and is not accepted
+    as a caller-controlled request field. The authentication mechanism is
+    provided outside this feature.
+servers:
+  - url: /
+paths:
+  /api/v1/transfers:
+    post:
+      operationId: createTransfer
+      summary: Submit a fund transfer
+      description: >-
+        A new, evaluated request is saved as a completed or rejected transaction
+        and returns 201 Created. A retry with the same customer-scoped
+        idempotency key and normalized request returns the original result with
+        200 OK. Rejected business outcomes use the same response schema and
+        include an error_code. SAME_AMOUNT denotes source and destination being
+        the same account, per FR-004.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferRequest"
+            example:
+              from_account: "10000001"
+              to_account: "20000002"
+              amount: "125.50"
+              idempotency_key: "8ab0a5b7-94ad-41a8-aad5-cf89fe9be170"
+      responses:
+        "201":
+          description: New transfer outcome saved, whether completed or rejected.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResponse"
+              example:
+                transaction_id: "84c038f9-4e1b-4e9f-908a-59779db1dbb9"
+                from_account: "XXXX0001"
+                to_account: "XXXX0002"
+                amount: "125.50"
+                status: "completed"
+                created_at: "2026-10-17T13:45:00Z"
+                error_code: null
+                message: "Transfer completed."
+        "200":
+          description: Original saved result returned for an identical retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferResponse"
+        "409":
+          description: Idempotency key was previously used with a different normalized request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "403":
+          description: Authenticated customer is not authorized to debit the source account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "404":
+          description: A referenced transfer account does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+        "422":
+          description: Request body is malformed or does not match the request schema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+components:
+  schemas:
+    TransferRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - from_account
+        - to_account
+        - amount
+        - idempotency_key
+      properties:
+        from_account:
+          type: string
+          minLength: 1
+          description: Sender account number.
+        to_account:
+          type: string
+          minLength: 1
+          description: Recipient account number.
+        amount:
+          type: string
+          pattern: "^-?[0-9]+(\\.[0-9]+)?$"
+          description: >-
+            Decimal currency amount in Rs. Parse as Decimal and apply the
+            half-up, two-place rounding rule before transfer validation.
+          examples:
+            - "125.50"
+            - "0.00"
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Identifies retries of the same logical request for this customer.
+    TransferResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - transaction_id
+        - from_account
+        - to_account
+        - amount
+        - status
+        - created_at
+        - error_code
+        - message
+      properties:
+        transaction_id:
+          type: string
+          format: uuid
+        from_account:
+          type: string
+          pattern: "^XXXX[0-9]{4}$"
+          description: Masked sender reference showing only the final four digits.
+        to_account:
+          type: string
+          pattern: "^XXXX[0-9]{4}$"
+          description: Masked recipient reference showing only the final four digits.
+        amount:
+          type: string
+          pattern: "^-?[0-9]+\\.[0-9]{2}$"
+          description: Evaluated amount in Rs, normalized to two decimal places.
+        status:
+          type: string
+          enum:
+            - completed
+            - rejected
+        created_at:
+          type: string
+          format: date-time
+          description: Transaction creation timestamp in UTC.
+        error_code:
+          type:
+            - string
+            - "null"
+          description: DAILY_LIMIT_EXCEEDED indicates that either the customer-wide cap or the source-account cap based on account age would be exceeded.
+          enum:
+            - INSUFFICIENT_BALANCE
+            - DAILY_LIMIT_EXCEEDED
+            - SAME_AMOUNT
+            - ACCOUNT_INACTIVE
+            - INVALID_AMOUNT
+            - null
+        message:
+          type: string
+          description: Customer-readable transfer outcome.
+    ApiError:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - IDEMPOTENCY_KEY_REUSED
+            - INVALID_REQUEST
+            - FORBIDDEN
+        message:
+          type: string
